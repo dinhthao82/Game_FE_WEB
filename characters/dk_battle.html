@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dark Knight vs Dark Knight — FE4/5 Battle</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; display:flex; flex-direction:column; align-items:center;
+       justify-content:center; min-height:100vh; gap:10px; }
+#c  { display:block; image-rendering:pixelated; cursor:pointer; }
+.ttl { font-family:monospace; font-size:13px; letter-spacing:3px; color:#e8c840; text-transform:uppercase; }
+.hint { font-family:monospace; font-size:10px; letter-spacing:2px; color:#3d1054; }
+</style>
+</head>
+<body>
+<div class="ttl">⬡ Battle ⬡</div>
+<canvas id="c" width="640" height="380" title="Click to replay"></canvas>
+<div class="hint">click to replay</div>
+
+<script>
+'use strict';
+// ── Palette ──────────────────────────────────────────────────────────
+const P={
+  S1:'#f5d4b0', S2:'#d4956a', S3:'#b07040',
+  H1:'#f0f0ff', H2:'#c0c0e0', H3:'#8888b8', HW:'#ffffff',
+  ER:'#dc2626', ED:'#8b0000',
+  A1:'#1a1a2a', A2:'#2a2a40', A3:'#0d0d18',
+  P1:'#5b21b6', P2:'#3d1054', P3:'#7c3aed',
+  GD:'#d4a017', OL:'#0d0d0d',
+  SW:'#c0c8d8', SWH:'#e8eef8', SWG:'#d4a017',
+};
+
+// ── Layout ───────────────────────────────────────────────────────────
+const SC=5;                  // sprite pixel scale
+const SPW=16*SC, SPH=24*SC; // 80×120
+const OFFCW=SPW+80;          // offscreen wider for sword extension (160px)
+const GY=252;                // ground Y (feet)
+const PS=38, PE=202;         // player X: start, attack
+const ES=640-38-SPW;         // enemy X start = 522
+const EA=640-202-SPW;        // enemy X attack = 358
+
+const P_DMG=8, E_DMG=5;
+
+// ── Helpers ──────────────────────────────────────────────────────────
+const lerp=(a,b,t)=>a+(b-a)*Math.min(1,Math.max(0,t));
+const ease=(t)=>t<.5?2*t*t:1-(-2*t+2)**2/2;
+const D=(c,s)=>({
+  r:(x,y,w,h,col)=>{if(!col)return;c.fillStyle=col;c.fillRect(x*s,y*s,w*s,h*s);},
+  p:(x,y,col)=>{if(!col)return;c.fillStyle=col;c.fillRect(x*s,y*s,s,s);}
+});
+
+// ── Walk frames [ldx,ldy,rdx,rdy,cox,by] ─────────────────────────────
+// Character drawn facing RIGHT. Left eye (x≈4-6) hidden behind curtain.
+const WK=[[1,1,-1,-1,-1,0],[0,-1,0,-1,0,-1],[-1,-1,1,1,1,0],[0,0,0,0,0,0]];
+
+// ── Sprite draw (right-facing, draws to OFF at 0,0) ─────────────────
+function drawSprite(ctx, wf, af){
+  ctx.clearRect(0,0,OFFCW,SPH);
+  const d=D(ctx,SC);
+  const [ldx,ldy,rdx,rdy,cox,by]=WK[wf&3];
+
+  // ── Cape back ──
+  d.r(0+cox,11+by,3,13,P.P2); d.r(1+cox,13+by,2,11,P.P1);
+  d.r(13-cox,11+by,3,13,P.P2); d.r(14-cox,13+by,2,11,P.P1);
+
+  // ── Torso ──
+  d.r(3,15+by,10,7,P.A1);
+  d.r(3,15+by,10,1,P.A2); d.r(3,15+by,1,7,P.A2); d.r(12,15+by,1,7,P.A2);
+  d.r(3,19+by,10,1,P.A2);
+  d.r(1,14+by,3,4,P.P1); d.r(1,14+by,3,1,P.P3);  // left pauldron
+  d.r(12,14+by,3,4,P.P1); d.r(12,14+by,3,1,P.P3); // right pauldron
+  d.r(5,16+by,6,1,P.GD);  // brooch
+  d.r(6,13+by,4,2,P.S1);  // neck
+
+  // ── Legs ──
+  d.r(3+ldx,22+ldy,3,3,P.A1); d.r(3+ldx,22+ldy,3,1,P.A2);
+  d.r(10+rdx,22+rdy,3,3,P.A1); d.r(10+rdx,22+rdy,3,1,P.A2);
+
+  // ── Hair ──
+  d.r(5,0+by,6,1,P.H2); d.r(4,1+by,8,2,P.H1);
+  d.r(3,3+by,10,3,P.H1); d.r(8,3+by,5,3,P.H2); d.r(11,3+by,3,3,P.H3);
+  d.p(4,1+by,P.HW); d.p(5,1+by,P.HW);
+  // Left curtain (covers left eye)
+  d.r(3,6+by,3,8,P.H1); d.r(4,8+by,2,6,P.H2); d.p(5,14+by,P.H3);
+  // Right short hair
+  d.r(12,5+by,2,4,P.H1); d.r(13,5+by,1,4,P.H2);
+
+  // ── Face ──
+  d.r(4,5+by,9,8,P.S1); d.r(10,6+by,3,7,P.S2);
+  // Right eye (x=8-11, right side of right-facing char)
+  d.r(7,6+by,5,3,P.OL); d.r(8,7+by,3,1,P.ER); d.p(9,7+by,P.HW);
+  d.p(7,7+by,P.S1); d.p(11,7+by,P.S1);
+  d.p(7,11+by,P.OL); d.p(8,11+by,P.OL); d.p(9,11+by,P.OL); // mouth
+
+  // ── Sword ──
+  if(af>=0&&af<4) drawSword(ctx, d, af, by);
+}
+
+function drawSword(ctx, d, af, by){
+  d.r(11,14+by,2,3,'#704800'); // handle
+  if(af===0){ // wind-up — sword raised diagonally up-right
+    d.r(13,5+by,2,1,P.SWH); // tip
+    d.r(13,6+by,1,5,P.SW);  // upper blade
+    d.r(12,9+by,2,4,P.SW);  // lower blade
+    d.r(11,13+by,4,1,P.SWG); // guard
+  } else if(af===1){ // slash — sword forward-right fast
+    // Extended right beyond sprite: draws into OFFCW area
+    for(let i=0;i<12;i++){
+      d.p(13+i,(5+Math.round(i*.15))+by, i<2?P.SWH:P.SW);
+    }
+    d.r(12,11+by,3,1,P.SWG); // guard
+  } else if(af===2){ // hit — sword fully extended, glowing
+    for(let i=0;i<14;i++){
+      const col=i<3?'#ffffff':i<5?P.SWH:P.SW;
+      d.p(13+i,(4+Math.round(i*.1))+by, col);
+    }
+    d.r(12,10+by,3,1,P.SWG);
+  } else if(af===3){ // follow-through — angling down-right
+    for(let i=0;i<8;i++){
+      d.p(12+i,(10+i)+by, i===0?P.SWH:P.SW);
+    }
+    d.r(11,10+by,3,1,P.SWG);
+  }
+}
+
+// ── Offscreen canvases ───────────────────────────────────────────────
+const OFF=document.createElement('canvas'); OFF.width=OFFCW; OFF.height=SPH;
+const OFC=OFF.getContext('2d'); OFC.imageSmoothingEnabled=false;
+const TMP=document.createElement('canvas'); TMP.width=OFFCW; TMP.height=SPH;
+const TPC=TMP.getContext('2d'); TPC.imageSmoothingEnabled=false;
+
+// Blit sprite to main canvas. facing='right' = no mirror; 'left' = mirrored.
+function blit(ctx, x, y, facing, wf, af, fl){
+  drawSprite(OFC, wf, af);
+  ctx.save();
+  if(facing==='left'){
+    // Mirror: translate to right edge of sprite, flip
+    ctx.translate(x+SPW, y); ctx.scale(-1,1);
+    // After flip: sword (at local x>SPW) extends LEFT toward player ✓
+  } else {
+    ctx.translate(x, y);
+  }
+  ctx.drawImage(OFF, 0, 0);
+  if(fl>0){
+    TPC.clearRect(0,0,OFFCW,SPH);
+    TPC.drawImage(OFF,0,0);
+    TPC.globalCompositeOperation='source-atop';
+    TPC.fillStyle=`rgba(255,255,255,${fl})`;
+    TPC.fillRect(0,0,OFFCW,SPH);
+    TPC.globalCompositeOperation='source-over';
+    ctx.drawImage(TMP,0,0);
+  }
+  ctx.restore();
+}
+
+// ── Background (pre-rendered) ────────────────────────────────────────
+const BGC=document.createElement('canvas'); BGC.width=640; BGC.height=280;
+(()=>{
+  const c=BGC.getContext('2d');
+  c.fillStyle='#04020a'; c.fillRect(0,0,640,280);
+  // Stone blocks
+  c.fillStyle='#100c1e';
+  for(let r=0;r<11;r++) for(let col=0;col<22;col++){
+    c.fillRect(col*30+(r%2)*15, r*24, 28, 22);
+  }
+  c.fillStyle='rgba(0,0,0,.55)'; c.fillRect(0,0,640,280);
+  // Arch pillars
+  c.fillStyle='#1a1430'; c.fillRect(0,0,20,280); c.fillRect(620,0,20,280);
+  c.fillStyle='#2a2040'; c.fillRect(20,0,4,280); c.fillRect(616,0,4,280);
+  // Torch glow L
+  let g=c.createRadialGradient(120,120,0,120,120,150);
+  g.addColorStop(0,'rgba(210,90,10,.30)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle=g; c.fillRect(0,0,640,280);
+  // Torch glow R
+  g=c.createRadialGradient(520,120,0,520,120,150);
+  g.addColorStop(0,'rgba(210,90,10,.30)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle=g; c.fillRect(0,0,640,280);
+  // Ground base
+  c.fillStyle='#08061a'; c.fillRect(0,200,640,80);
+  c.fillStyle='#140e2a';
+  for(let col=0;col<18;col++){
+    c.fillRect(col*36,205,34,11); c.fillRect(col*36+18,219,34,9);
+  }
+  c.fillStyle='#221640'; c.fillRect(0,232,640,4);
+  c.fillStyle='#0c0818'; c.fillRect(0,236,640,44);
+})();
+
+function drawBG(ctx, px, ex){
+  ctx.drawImage(BGC,0,0);
+  // Dynamic platform glows
+  ctx.fillStyle='rgba(91,33,182,.18)'; ctx.fillRect(px-8,232,SPW+16,20);
+  ctx.fillStyle='rgba(180,20,20,.14)'; ctx.fillRect(ex-8,232,SPW+16,20);
+}
+
+// ── HP bar ───────────────────────────────────────────────────────────
+function drawHP(ctx,x,y,w,name,lvl,hp,mhp,side){
+  ctx.fillStyle='#05030e'; ctx.fillRect(x,y,w,90);
+  ctx.strokeStyle='#2a1848'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,90);
+  const tx=side==='l'?x+10:x+w-10;
+  ctx.textAlign=side==='l'?'left':'right';
+  ctx.fillStyle='#f0f0c0'; ctx.font='bold 13px monospace';
+  ctx.fillText(name,tx,y+19);
+  ctx.fillStyle='#5b21b6'; ctx.font='10px monospace';
+  ctx.fillText(`LV${lvl} DARK KNIGHT`,tx,y+33);
+  ctx.fillStyle='#8090a8';
+  ctx.fillText(`HP  ${Math.max(0,hp)} / ${mhp}`,tx,y+50);
+  // HP bar
+  const bx=x+8, bw=w-16;
+  ctx.fillStyle='#1a1a2a'; ctx.fillRect(bx,y+57,bw,15);
+  const f=Math.max(0,hp)/mhp;
+  ctx.fillStyle=f>.5?'#22c55e':f>.25?'#eab308':'#ef4444';
+  ctx.fillRect(bx,y+57,~~(bw*f),15);
+  ctx.fillStyle='#05030e';
+  for(let i=1;i<mhp;i++) ctx.fillRect(bx+~~(bw*i/mhp),y+57,1,15);
+  ctx.strokeStyle='#2a2a40'; ctx.lineWidth=1; ctx.strokeRect(bx,y+57,bw,15);
+}
+
+// ── Slash / impact effect ────────────────────────────────────────────
+function drawSlash(ctx, cx, cy, prog, dir){
+  const a=Math.max(0,1-prog);
+  ctx.save(); ctx.translate(cx,cy); ctx.globalAlpha=a;
+  const s=dir==='r'?1:-1;
+  // Big arc
+  ctx.strokeStyle='#fff'; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.arc(0,0,35+prog*30,-1.4*s,0.6*s,s<0); ctx.stroke();
+  // Thinner trails
+  ctx.lineWidth=2; ctx.strokeStyle='rgba(160,120,255,.7)';
+  ctx.beginPath(); ctx.arc(0,0,55+prog*20,-1.0*s,0.3*s,s<0); ctx.stroke();
+  // Speed lines
+  ctx.lineWidth=1; ctx.strokeStyle='rgba(200,180,255,.4)';
+  for(let i=-4;i<=4;i++){
+    ctx.beginPath();
+    ctx.moveTo(s*18,i*12); ctx.lineTo(s*(65+Math.random()*18),i*12); ctx.stroke();
+  }
+  // Impact burst
+  if(prog<.25){
+    const r=60*(1-prog/.25);
+    const ig=ctx.createRadialGradient(s*30,0,0,s*30,0,r);
+    ig.addColorStop(0,'rgba(255,220,100,.55)'); ig.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=ig; ctx.fillRect(-r+s*30,-r,r*2,r*2);
+  }
+  ctx.restore();
+}
+
+// ── Floating damage number ───────────────────────────────────────────
+function drawDmg(ctx,x,y,val,prog){
+  const fy=y-prog*60, a=prog<.5?1:1-(prog-.5)/.5;
+  ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center';
+  ctx.font=`bold ${22+~~(prog*8)}px monospace`;
+  ctx.strokeStyle='#000'; ctx.lineWidth=5;
+  ctx.strokeText(`-${val}`,x,fy);
+  ctx.fillStyle=prog<.15?'#ffff40':prog<.3?'#ffe040':'#ffffff';
+  ctx.fillText(`-${val}`,x,fy);
+  ctx.restore();
+}
+
+// ── Idle breathing (slow bob) ────────────────────────────────────────
+let idleT=0;
+function idleWF(){ return (idleT/500|0)%2===0?3:1; }
+
+// ═══════════════════════════════════════════════════════════════════
+// BATTLE STATE
+// ═══════════════════════════════════════════════════════════════════
+const s={
+  t:0, px:PS, ex:ES,
+  php:20, ehp:24,
+  pfl:0, efl:0,
+  sp:-1, se:-1,
+  dp:-1, de:-1,
+  wk:0, wt:0,
+  pak:-1, eak:-1,
+  sx:0, sy:0,
+  seq:0,
+  _ph:false, _eh:false,
+};
+
+// ── Sequence ─────────────────────────────────────────────────────────
+const SEQ=[
+  {t:0,    fn(){ s.px=-SPW; s.ex=640; }},              // off-screen start
+  // intro: 0-500ms slide in, 500-1100 idle
+
+  // Player attack round
+  {t:1500, fn(){ s.pak=0; }},                           // wind-up
+  {t:1660, fn(){ s.pak=1; }},                           // slash
+  {t:1820, fn(){                                         // hit
+    s.pak=2; s.sp=0; s.de=0; s.efl=1; s.sx=10; s.sy=-7;
+    if(!s._eh){ s.ehp-=P_DMG; s._eh=true; }
+  }},
+  {t:2010, fn(){ s.pak=3; }},                           // follow
+  {t:2160, fn(){ s.pak=-1; }},                          // done attacking
+
+  // pause, then enemy counter
+  {t:3000, fn(){ s.eak=0; }},                           // enemy wind-up
+  {t:3160, fn(){ s.eak=1; }},                           // enemy slash
+  {t:3310, fn(){                                         // enemy hit
+    s.eak=2; s.se=0; s.dp=0; s.pfl=1; s.sx=-9; s.sy=-6;
+    if(!s._ph){ s.php-=E_DMG; s._ph=true; }
+  }},
+  {t:3500, fn(){ s.eak=3; }},                           // enemy follow
+  {t:3660, fn(){ s.eak=-1; }},                          // done
+
+  // hold result, then loop
+  {t:4500, fn(){ reset(); }},
+];
+
+function reset(){
+  Object.assign(s,{
+    t:0, px:PS, ex:ES, php:20, ehp:24,
+    pfl:0, efl:0, sp:-1, se:-1, dp:-1, de:-1,
+    wk:0, wt:0, pak:-1, eak:-1, sx:0, sy:0,
+    seq:0, _ph:false, _eh:false,
+  });
+  idleT=0;
+}
+
+// ── Update ───────────────────────────────────────────────────────────
+function update(dt){
+  s.t += dt;
+  idleT += dt;
+  while(s.seq < SEQ.length && s.t >= SEQ[s.seq].t) SEQ[s.seq++].fn();
+
+  // Walk animation
+  s.wt+=dt; if(s.wt>=125){ s.wk=(s.wk+1)&3; s.wt=0; }
+
+  // ── Positions ──
+  const t=s.t;
+  if(t<500){
+    const p=ease(t/500); s.px=lerp(-SPW,PS,p); s.ex=lerp(640,ES,p);
+  } else {
+    // Player X
+    if(t<1100)      s.px=PS;
+    else if(t<1500) s.px=lerp(PS,PE,ease((t-1100)/400));
+    else if(t<2160) s.px=PE;
+    else if(t<2540) s.px=lerp(PE,PS,ease((t-2160)/380));
+    else            s.px=PS;
+    // Enemy X
+    if(t<2600)       s.ex=ES;
+    else if(t<3000)  s.ex=lerp(ES,EA,ease((t-2600)/400));
+    else if(t<3660)  s.ex=EA;
+    else if(t<4040)  s.ex=lerp(EA,ES,ease((t-3660)/380));
+    else             s.ex=ES;
+  }
+
+  // ── Effect decay ──
+  s.efl=Math.max(0, s.efl-dt/140);
+  s.pfl=Math.max(0, s.pfl-dt/140);
+  if(s.sp>=0){ s.sp=Math.min(1,s.sp+dt/360); if(s.sp>=1) s.sp=-1; }
+  if(s.se>=0){ s.se=Math.min(1,s.se+dt/360); if(s.se>=1) s.se=-1; }
+  if(s.de>=0){ s.de=Math.min(1,s.de+dt/900); if(s.de>=1) s.de=-1; }
+  if(s.dp>=0){ s.dp=Math.min(1,s.dp+dt/900); if(s.dp>=1) s.dp=-1; }
+  s.sx*=.68; s.sy*=.68;
+  if(Math.abs(s.sx)<.2) s.sx=0;
+  if(Math.abs(s.sy)<.2) s.sy=0;
+}
+
+// ── Render ───────────────────────────────────────────────────────────
+const cv=document.getElementById('c');
+const ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+
+function render(){
+  ctx.clearRect(0,0,640,380);
+  ctx.save();
+  ctx.translate(~~s.sx, ~~s.sy);
+
+  const px=~~s.px, ex=~~s.ex;
+  const py=GY-SPH, ey=GY-SPH;
+
+  drawBG(ctx, px, ex);
+
+  // Slash effects
+  if(s.sp>=0) drawSlash(ctx, ex+SPW/2, ey+SPH*.5, s.sp, 'l');
+  if(s.se>=0) drawSlash(ctx, px+SPW/2, py+SPH*.5, s.se, 'r');
+
+  // Walk frames: only animate during movement phases
+  const t=s.t;
+  const isPW=(t>=1100&&t<1500)||(t>=2160&&t<2540);
+  const isEW=(t>=2600&&t<3000)||(t>=3660&&t<4040);
+  const isIdle=(t>=500&&t<1100)||(t>=2540&&t<2600)||(t>=4040);
+  const pwk = isPW ? s.wk : (isIdle&&s.pak<0) ? idleWF() : 3;
+  const ewk = isEW ? s.wk : (isIdle&&s.eak<0) ? idleWF() : 3;
+
+  // Draw enemy first (behind player if they overlap at closest)
+  blit(ctx, ex, ey, 'left',  ewk, s.eak, s.efl);
+  blit(ctx, px, py, 'right', pwk, s.pak, s.pfl);
+
+  // Damage numbers
+  if(s.de>=0) drawDmg(ctx, ex+SPW/2, ey, P_DMG, s.de);
+  if(s.dp>=0) drawDmg(ctx, px+SPW/2, py, E_DMG, s.dp);
+
+  ctx.restore(); // end shake
+
+  // ── UI bar (y=280, no shake) ──
+  ctx.fillStyle='#04020c'; ctx.fillRect(0,280,640,100);
+  ctx.fillStyle='#201438'; ctx.fillRect(0,280,640,2);
+  drawHP(ctx,  3,283,310,'SABLE',     1, s.php, 20,'l');
+  drawHP(ctx,327,283,310,'DARK KNT.', 3, s.ehp, 24,'r');
+  ctx.fillStyle='#5b21b6'; ctx.fillRect(319,283,2,92);
+}
+
+// ── Main loop ────────────────────────────────────────────────────────
+let last=0;
+function loop(ts){
+  const dt=Math.min(ts-last,50);
+  last=ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+cv.addEventListener('click', reset);
+reset();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sable · Dark Knight · FE4/5 Style</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #08080f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+  font-family: 'Courier New', monospace;
+  color: #f0f0c0;
+  min-height: 100vh;
+  gap: 28px;
+}
+h1 {
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #e8c840;
+  text-transform: uppercase;
+}
+.row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+.col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.label {
+  font-size: 10px;
+  color: #5b21b6;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ── FE4 conversation-box chrome ── */
+.fe-window {
+  background: #0a0a18;
+  border: 3px solid #e8c840;
+  box-shadow: inset 0 0 0 1px #4a3800, 0 0 0 1px #704800, 0 0 24px #e8c84028;
+  padding: 3px;
+}
+.fe-titlebar {
+  background: #1a0a3a;
+  border-bottom: 1px solid #e8c840;
+  padding: 3px 8px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #e8c840;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+/* ── Stats window ── */
+.stats-win {
+  background: #08080f;
+  border: 2px solid #3a2a68;
+  padding: 14px 18px;
+  min-width: 190px;
+  box-shadow: inset 0 0 0 1px #1a1a2a;
+}
+.s-name { font-size: 15px; color: #f0f0c0; letter-spacing: 1px; }
+.s-class { font-size: 9px; color: #5b21b6; letter-spacing: 2px; margin: 2px 0 10px; }
+.s-row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: #8090a8; margin: 3px 0; gap: 16px;
+}
+.s-row span:last-child { color: #d0d8e8; min-width: 28px; text-align: right; }
+.s-row.odo span:last-child { color: #7c3aed; }
+.divider { border: none; border-top: 1px solid #1a1a2a; margin: 8px 0; }
+.blood {
+  display: inline-block; background: #1a0530;
+  border: 1px solid #5b21b6; color: #a070e0;
+  font-size: 9px; padding: 2px 8px; letter-spacing: 1px;
+  margin-top: 4px;
+}
+.skill-tag {
+  display: inline-block; background: #0a0520;
+  border: 1px solid #3d1054; color: #7c3aed;
+  font-size: 9px; padding: 1px 6px; margin: 1px 0;
+  letter-spacing: 1px;
+}
+
+/* ── Sprite frames ── */
+.frames { display: flex; gap: 6px; align-items: flex-end; }
+.frame-label { font-size: 9px; color: #2a2a40; text-align: center; }
+canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+
+<h1>⬡ Sable — Dark Knight — Lv.1 ⬡</h1>
+
+<div class="row">
+
+  <!-- Portrait -->
+  <div class="col">
+    <div class="label">Portrait</div>
+    <div class="fe-window">
+      <div class="fe-titlebar">
+        <span>SABLE</span><span>DARK KNIGHT</span>
+      </div>
+      <canvas id="portrait" width="480" height="400"></canvas>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="col">
+    <div class="label">Status</div>
+    <div class="stats-win">
+      <div class="s-name">SABLE</div>
+      <div class="s-class">DARK KNIGHT · F · LV.1</div>
+      <div class="s-row"><span>HP</span><span>20</span></div>
+      <div class="s-row odo"><span>STR</span><span>12</span></div>
+      <div class="s-row"><span>MAG</span><span>1</span></div>
+      <div class="s-row"><span>DEF</span><span>6</span></div>
+      <div class="s-row"><span>RES</span><span>2</span></div>
+      <div class="s-row"><span>SPD</span><span>5</span></div>
+      <div class="s-row"><span>SKL</span><span>5</span></div>
+      <div class="s-row"><span>LCK</span><span>3</span></div>
+      <hr class="divider">
+      <div class="s-row"><span>Weapon</span><span style="color:#8888b8;font-size:10px">Iron Sword</span></div>
+      <div class="s-row"><span>HP Left</span><span>50/50</span></div>
+      <hr class="divider">
+      <div class="blood">⬡ Minor Odo Blood</div><br>
+      <div class="skill-tag">DARKWAVE</div><br>
+      <div class="skill-tag">SHADOW_STEP</div><br>
+      <div class="skill-tag">COVER</div>
+    </div>
+  </div>
+
+  <!-- Map Sprite -->
+  <div class="col">
+    <div class="label">Map Sprite</div>
+
+    <!-- Animated -->
+    <div class="fe-window" style="padding:8px; background:#3c5e2e;">
+      <canvas id="animated" width="128" height="192"></canvas>
+    </div>
+    <div class="label" style="font-size:9px">WALK · 8fps</div>
+
+    <!-- 4 frames strip -->
+    <div class="label" style="margin-top:8px">Frames</div>
+    <div class="frames">
+      <div class="col"><canvas class="fcanvas" data-frame="0" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">F1</div></div>
+      <div class="col"><canvas class="fcanvas" data-frame="1" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">F2</div></div>
+      <div class="col"><canvas class="fcanvas" data-frame="2" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">F3</div></div>
+      <div class="col"><canvas class="fcanvas" data-frame="3" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">F4</div></div>
+    </div>
+
+    <!-- Attack animation -->
+    <div class="label" style="margin-top:12px">Attack</div>
+    <div class="frames">
+      <div class="col"><canvas class="acanvas" data-frame="0" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">wind</div></div>
+      <div class="col"><canvas class="acanvas" data-frame="1" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">slash</div></div>
+      <div class="col"><canvas class="acanvas" data-frame="2" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">hit</div></div>
+      <div class="col"><canvas class="acanvas" data-frame="3" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">follow</div></div>
+      <div class="col"><canvas class="acanvas" data-frame="4" width="64" height="96" style="background:#3c5e2e"></canvas><div class="frame-label">return</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// PALETTE — 16 colours (FE4/5 SNES constraint)
+// ═══════════════════════════════════════════════════════════════════
+const C = {
+  BG : '#0a0a18',
+  BG2: '#12123a',
+  S1 : '#f5d4b0',   // skin base
+  S2 : '#d4956a',   // skin shadow
+  S3 : '#b07040',   // skin deep
+  H1 : '#f0f0ff',   // hair light (platinum white)
+  H2 : '#c0c0e0',   // hair mid
+  H3 : '#8888b8',   // hair dark
+  HW : '#ffffff',   // hair highlight
+  ER : '#dc2626',   // eye red
+  ED : '#8b0000',   // eye dark
+  A1 : '#1a1a2a',   // armor black
+  A2 : '#2a2a40',   // armor edge
+  A3 : '#0d0d18',   // armor deep
+  P1 : '#5b21b6',   // cape purple
+  P2 : '#3d1054',   // cape dark
+  P3 : '#7c3aed',   // cape bright
+  GD : '#d4a017',   // gold
+  GD2: '#ffd700',   // gold bright
+  OL : '#0d0d0d',   // outline
+};
+
+function makeD(ctx, sc) {
+  return {
+    r(x,y,w,h,c){ if(!c) return; ctx.fillStyle=c; ctx.fillRect(x*sc,y*sc,w*sc,h*sc); },
+    p(x,y,c)    { if(!c) return; ctx.fillStyle=c; ctx.fillRect(x*sc,y*sc,sc,sc);     }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PORTRAIT  96×80 logical  ·  scale=5  →  480×400 canvas
+// ═══════════════════════════════════════════════════════════════════
+(function portrait() {
+  const cv = document.getElementById('portrait');
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  const {r,p} = makeD(cx, 5);
+
+  // Background
+  r(0,0,96,80, C.BG);
+  r(16,0,64,80, C.BG2);
+
+  // ── Cape back (painted first, everything draws over) ──────────
+  r(0,46,14,34, C.P2);   r(1,48,11,32, C.P1);   r(1,48,4,30, C.P3);
+  r(82,46,14,34, C.P2);  r(83,48,11,32, C.P1);  r(89,48,4,30, C.P3);
+
+  // ── Armor body ───────────────────────────────────────────────
+  // Left shoulder block
+  r(8,50,28,30, C.A1);  r(8,50,28,2, C.A2);  r(8,50,2,30, C.A2);
+  // Right shoulder block
+  r(60,50,28,30, C.A1); r(60,50,28,2, C.A2); r(86,50,2,30, C.A2);
+  // Centre chest
+  r(30,50,36,30, C.A1);
+  r(30,52,2,28, C.A2);  r(64,52,2,28, C.A2);  // chest ribs
+  r(30,64,36,1, C.A2);  r(30,70,36,1, C.A3);
+
+  // Purple pauldrons
+  r(10,50,22,6, C.P1); r(11,50,20,2, C.P3); r(11,52,18,2, C.P2);
+  r(64,50,22,6, C.P1); r(65,50,20,2, C.P3); r(65,52,18,2, C.P2);
+
+  // Gold brooch
+  r(36,54,24,2, C.A2);
+  r(40,56,16,4, C.GD); r(44,57,8,2, C.GD2);
+
+  // Armor outline
+  r(7,49,82,1, C.OL); r(7,49,1,31,C.OL); r(88,49,1,31,C.OL);
+
+  // ── Neck ─────────────────────────────────────────────────────
+  r(38,44,20,8, C.S1);
+  r(38,49,6,3, C.S2); r(52,49,6,3, C.S2);
+
+  // ── Face skin (drawn before hair, hair overlaps) ─────────────
+  r(28,12,44,34, C.S1);
+  // Cheek shadow (right face)
+  r(60,16,10,28, C.S2); r(64,16,6,26, C.S3);
+  // Jaw shadow
+  r(28,40,44,6, C.S2); r(30,44,40,2, C.S3);
+
+  // ── Hair (drawn OVER face) ───────────────────────────────────
+  // Top mass
+  r(22,2,52,2, C.H2);
+  r(20,4,56,3, C.H1);
+  r(18,7,60,4, C.H1);
+  r(18,11,62,6, C.H1);
+  // Right shading
+  r(50,4,26,8, C.H2); r(60,4,16,11, C.H3); r(68,7,10,4, C.H3);
+  // Highlight (top-left)
+  r(22,4,5,2, C.HW); r(22,4,3,1, C.HW);
+
+  // Left curtain — long, covers left eye entirely
+  r(14,12,18,32, C.H1);
+  r(16,14,14,30, C.H2);
+  r(20,16,10,28, C.H3);
+  // Curtain tip taper
+  r(16,44,8,2, C.H1); r(18,46,5,2, C.H2); r(20,48,3,1, C.H3);
+
+  // Right side (short cut, ear visible)
+  r(68,12,14,12, C.H1); r(72,12,10,12, C.H2); r(76,14,6,8, C.H3);
+
+  // Front bangs (overlap forehead)
+  r(26,12,38,4, C.H1); r(28,12,34,2, C.H2);
+  r(54,12,16,4, C.H1); r(58,12,12,3, C.H2);
+
+  // Hair outline
+  r(14,11,68,1, C.OL); // top silhouette
+  r(14,11,1,37, C.OL); // left silhouette
+  r(82,11,1,7, C.OL);  // right top
+
+  // ── Right eyebrow ─────────────────────────────────────────────
+  r(52,17,16,2, C.H2); r(52,17,16,1, C.H3);
+
+  // ── Right eye (left eye hidden behind curtain) ────────────────
+  r(52,19,16,11, C.OL);        // outer outline
+  r(53,20,14,9, C.S1);          // clear skin inside
+  r(52,19,16,2, C.OL);          // top lash (thick)
+  r(53,28,14,1, C.OL);          // bottom lash
+  p(52,27, C.OL); p(67,27, C.OL); // corner lashes
+  // Iris
+  r(53,21,14,6, C.ER);
+  r(56,22,8,4, C.ED);           // pupil zone
+  // Whites at corners
+  r(53,21,2,4, C.HW);
+  r(65,21,2,3, C.HW);
+  // Highlight spark
+  r(53,21,3,2, C.HW);
+  p(53,21, C.HW);
+  // Lower iris rim
+  r(53,26,14,1, '#aa1111');
+
+  // ── Nose ─────────────────────────────────────────────────────
+  p(46,35, C.S2); p(47,35, C.S2); p(47,36, C.S3); p(48,36, C.S2);
+
+  // ── Mouth (cold, thin line) ───────────────────────────────────
+  r(42,40,16,1, C.OL);
+  r(43,39,14,1, C.S2);
+  r(43,41,14,1, C.S3);
+  p(42,40, C.S3); p(57,40, C.S3); // corners
+
+  // Face outline (jaw/chin)
+  r(27,11,1,35, C.OL); // left face edge
+  r(71,11,1,33, C.OL); // right face edge
+  r(27,44,44,1, C.OL); // chin line
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// BATTLE SPRITE  16×24 logical  ·  drawSprite(ctx, sc, walkFrame)
+// ═══════════════════════════════════════════════════════════════════
+// Walk leg offsets: [leftDx, leftDy, rightDx, rightDy, capeOx]
+const WALK = [
+  [-1, 1,  1,-1,  1],   // F1 left-forward
+  [ 0,-1,  0,-1,  0],   // F2 up
+  [ 1,-1, -1, 1, -1],   // F3 right-forward
+  [ 0, 0,  0, 0,  0],   // F4 neutral
+];
+
+function drawSprite(ctx, sc, frame) {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  const {r,p} = makeD(ctx, sc);
+  const [ldx,ldy,rdx,rdy,cox] = WALK[frame & 3];
+
+  // Body sway (slight Y offset for up/down)
+  const by = (frame===1) ? -1 : 0;
+
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.28)';
+  ctx.fillRect(1*sc,(23)*sc,14*sc,sc);
+
+  // ── Hair top ──
+  r(5+0, 0+by, 6, 1, C.H2);
+  r(4+0, 1+by, 8, 2, C.H1);
+  r(3+0, 3+by,10, 3, C.H1);
+  r(9+0, 3+by, 4, 3, C.H2);
+  r(11+0,3+by, 2, 3, C.H3);
+  p(4, 1+by, C.HW); p(5,1+by, C.HW); // highlight
+
+  // Left curtain (hangs, covers left)
+  r(3, 6+by, 3, 7, C.H1);
+  r(4, 8+by, 2, 5, C.H2);
+  p(4,13+by, C.H3);
+
+  // Right hair
+  r(12,5+by, 2, 4, C.H1);
+  r(13,5+by, 1, 4, C.H2);
+
+  // ── Face ──
+  r(4, 5+by, 9, 8, C.S1);
+  r(10,6+by, 3, 6, C.S2); // right cheek shadow
+
+  // Right eye (single pixel size at this res)
+  r(7, 6+by, 4, 3, C.OL);   // outline box
+  r(8, 7+by, 2, 1, C.ER);   // iris
+  p(7, 7+by, C.S1);          // left white
+  p(10,7+by, C.S1);          // right white
+  p(8, 7+by, C.HW);          // highlight
+
+  // Mouth
+  p(7,11+by, C.OL); p(8,11+by, C.OL); p(9,11+by, C.OL);
+
+  // ── Neck ──
+  r(6,13+by,4,2, C.S1);
+
+  // ── Cape back ──
+  r(0+cox,12+by, 3,11, C.P2); r(0+cox,13+by,2,9, C.P1);
+  r(13-cox,12+by,3,11, C.P2); r(14-cox,13+by,2,9, C.P1);
+
+  // ── Torso armor ──
+  r(3,15+by,10,7, C.A1);
+  r(3,15+by,10,1, C.A2);  // top highlight
+  r(3,15+by, 1,7, C.A2);  // left highlight
+  r(12,15+by,1,7, C.A2);  // right highlight
+  r(3,19+by,10,1, C.A2);  // chest line
+  // Gold brooch
+  r(5,16+by, 6,1, C.GD);
+
+  // Purple pauldrons
+  r(2,14+by,3,3, C.P1); r(2,14+by,3,1, C.P3);
+  r(11,14+by,3,3, C.P1); r(11,14+by,3,1, C.P3);
+
+  // ── Legs ──
+  // Left leg
+  r(4+ldx, 22+ldy, 3, 4, C.A1);
+  r(4+ldx, 22+ldy, 3, 1, C.A2);
+  // Right leg
+  r(9+rdx, 22+rdy, 3, 4, C.A1);
+  r(9+rdx, 22+rdy, 3, 1, C.A2);
+}
+
+// ── Attack sprite (5 frames) ──────────────────────────────────────
+// sword offset per frame: [swordX, swordY, bodyLean]
+const ATK = [
+  { sx:14, sy:10, lean:-1, label:'wind'   },  // F1 wind-up
+  { sx:16, sy:4,  lean: 1, label:'slash'  },  // F2 strike start
+  { sx:18, sy:1,  lean: 1, label:'hit'    },  // F3 full extend
+  { sx:14, sy:6,  lean: 0, label:'follow' },  // F4 follow-through
+  { sx: 0, sy: 0, lean: 0, label:'return' },  // F5 return
+];
+
+function drawAttackSprite(ctx, sc, atkFrame) {
+  const {sx,sy,lean} = ATK[atkFrame];
+  // Draw base (neutral walk frame)
+  drawSprite(ctx, sc, 3);
+  if (atkFrame === 4) return; // return = same as idle
+
+  const {r,p} = makeD(ctx, sc);
+
+  // Body lean
+  if (lean !== 0) {
+    // Shift upper body by lean (simplified: just draw over)
+  }
+
+  // Sword (iron sword — grey blade)
+  const sw_col = '#c0c8d8';
+  const sw_edge= '#8090a8';
+  const sw_guard='#d4a017';
+  // Blade
+  if (atkFrame < 3) {
+    r(sx,   sy,   1, 6, sw_col);
+    r(sx,   sy,   1, 1, '#ffffff'); // tip
+    p(sx-1, sy+1, sw_edge);
+    // Guard
+    r(sx-1, sy+5, 3, 1, sw_guard);
+    // Handle (at x=12-13, y=14-16)
+    r(12, 14, 2, 2, '#704800');
+  } else {
+    // Follow-through: sword diagonal
+    for(let i=0;i<5;i++){
+      p(sx-i, sy+i, i===0?'#ffffff':sw_col);
+    }
+    r(sx-4,sy+5,3,1,sw_guard);
+    r(12,14,2,2,'#704800');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Render all static frames
+// ═══════════════════════════════════════════════════════════════════
+document.querySelectorAll('.fcanvas').forEach(cv => {
+  const f = parseInt(cv.dataset.frame);
+  const cx = cv.getContext('2d'); cx.imageSmoothingEnabled=false;
+  drawSprite(cx, 4, f);
+});
+
+document.querySelectorAll('.acanvas').forEach(cv => {
+  const f = parseInt(cv.dataset.frame);
+  const cx = cv.getContext('2d'); cx.imageSmoothingEnabled=false;
+  drawAttackSprite(cx, 4, f);
+});
+
+// ── Animated walk (8fps) ──────────────────────────────────────────
+const animCv = document.getElementById('animated');
+const animCx = animCv.getContext('2d'); animCx.imageSmoothingEnabled=false;
+let animFrame = 0;
+let lastTime = 0;
+const FPS = 8;
+const INTERVAL = 1000 / FPS;
+
+function animate(ts) {
+  if (ts - lastTime >= INTERVAL) {
+    lastTime = ts;
+    drawSprite(animCx, 8, animFrame);
+    animFrame = (animFrame + 1) & 3;
+  }
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
