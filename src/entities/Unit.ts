@@ -101,4 +101,18 @@ export class Unit extends Phaser.GameObjects.Container {
   setSelected(on: boolean) {
     this.bodyRect.setStrokeStyle(on ? 2 : 0, 0xffe040);
   }
+
+  flashColor(color: number) {
+    // Tint all child objects temporarily
+    this.list.forEach(child => {
+      const go = child as Phaser.GameObjects.GameObject & { setTint?: (c: number) => void; clearTint?: () => void };
+      go.setTint?.(color);
+    });
+    this.scene.time.delayedCall(160, () => {
+      this.list.forEach(child => {
+        const go = child as Phaser.GameObjects.GameObject & { clearTint?: () => void };
+        go.clearTint?.();
+      });
+    });
+  }
 }
