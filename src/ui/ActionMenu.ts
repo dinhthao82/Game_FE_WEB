@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type ActionChoice = 'ATTACK' | 'WAIT' | 'ITEM';
+export type ActionChoice = 'ATTACK' | 'ITEM' | 'WAIT';
 
 interface MenuItem {
   label: string;
@@ -29,12 +29,13 @@ export class ActionMenu extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
-  open(x: number, y: number, canAttack: boolean, onChoose: (a: ActionChoice) => void) {
+  open(x: number, y: number, canAttack: boolean, canItem: boolean, onChoose: (a: ActionChoice) => void) {
     this.onChoose = onChoose;
     this.cursor = 0;
 
     this.items = [
       { label: 'Attack', action: 'ATTACK', enabled: canAttack },
+      { label: 'Item',   action: 'ITEM',   enabled: canItem },
       { label: 'Wait',   action: 'WAIT',   enabled: true },
     ];
 

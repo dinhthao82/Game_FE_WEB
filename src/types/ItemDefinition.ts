@@ -13,6 +13,8 @@ export interface WeaponDefinition {
   range: [number, number];   // [min, max]
   brave: boolean;
   isHoly: boolean;
+  /** D/C rank weapons become DISABLED (stay in slot, 0 dur); B/A/HOLY weapons BREAK (removed from loadout) */
+  onBreak: 'DISABLED' | 'BREAKS';
   holyBlood?: HolyBlood;
   bloodRankRequired?: BloodRank;
   statBonus?: Partial<{

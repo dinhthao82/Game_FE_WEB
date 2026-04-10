@@ -3,6 +3,10 @@ import { GridSystem } from '@/systems/GridSystem';
 import type { GridPos } from '@/systems/GridSystem';
 import { TurnSystem } from '@/systems/TurnSystem';
 import { calcDamage, resolveStrike } from '@/systems/CombatSystem';
+import { applyPostCombatDurability } from '@/systems/DurabilitySystem';
+import { calcCombatXP, addExperience } from '@/systems/ExperienceSystem';
+import { LevelUpDisplay } from '@/ui/LevelUpDisplay';
+import { InventoryPanel } from '@/ui/InventoryPanel';
 import { planEnemyTurn } from '@/systems/AISystem';
 import { Unit } from '@/entities/Unit';
 import { ActionMenu } from '@/ui/ActionMenu';
@@ -125,6 +129,8 @@ export class BattleScene extends Phaser.Scene {
   // ── UI ─────────────────────────────────────────────────────────
   private actionMenu!: ActionMenu;
   private forecast!: BattleForecast;
+  private levelUpDisplay!: LevelUpDisplay;
+  private inventoryPanel!: InventoryPanel;
   private infoText!: Phaser.GameObjects.Text;
   private phaseText!: Phaser.GameObjects.Text;
   private turnText!: Phaser.GameObjects.Text;
@@ -356,6 +362,7 @@ export class BattleScene extends Phaser.Scene {
     if (this.actionMenu.isOpen) {
       // Cancel action menu → return unit to origin
       this.actionMenu.close();
+      this.inventoryPanel.hide();
       if (this.selectedUnit && this.unitOriginPos) {
         this.selectedUnit.moveToGrid(this.unitOriginPos, TW, TH);
       }
@@ -394,15 +401,26 @@ export class BattleScene extends Phaser.Scene {
     const canAttack    = this.enemyUnits.some(e =>
       attackRange.some(t => t.col === e.gridPos.col && t.row === e.gridPos.row)
     );
+    // Item enabled if unit has a STAFF weapon with durability
+    const hasStaff = this.selectedUnit.heroData.combatLoadout.some(slot => {
+      const def = WEAPONS_BY_ID[slot.defId];
+      return def?.type === 'STAFF' && slot.currentDurability > 0;
+    });
     const { col, row } = this.selectedUnit.gridPos;
     this.actionMenu.open(
       col * TW + TW + 4, row * TH,
-      canAttack,
+      canAttack, hasStaff,
       (choice: ActionChoice) => this.onActionChoice(choice),
+    );
+    // Show inventory panel opposite side
+    this.inventoryPanel.show(
+      this.selectedUnit.heroData,
+      Math.max(0, col * TW - 154), row * TH,
     );
   }
 
   private onActionChoice(choice: ActionChoice) {
+    this.inventoryPanel.hide();
     if (choice === 'WAIT') {
       this.finishUnitTurn(this.selectedUnit!);
       return;
@@ -410,7 +428,46 @@ export class BattleScene extends Phaser.Scene {
     if (choice === 'ATTACK') {
       this.state = 'SELECT_ATTACK';
       this.showAttackRange(this.selectedUnit!);
+      return;
     }
+    if (choice === 'ITEM') {
+      this.useFirstStaff(this.selectedUnit!);
+    }
+  }
+
+  /** Use the first STAFF weapon in loadout — heals self by weapon might * 2 */
+  private useFirstStaff(unit: Unit) {
+    const slotIdx = unit.heroData.combatLoadout.findIndex(slot => {
+      const def = WEAPONS_BY_ID[slot.defId];
+      return def?.type === 'STAFF' && slot.currentDurability > 0;
+    });
+    if (slotIdx < 0) { this.finishUnitTurn(unit); return; }
+
+    const slot = unit.heroData.combatLoadout[slotIdx];
+    const def  = WEAPONS_BY_ID[slot.defId];
+    if (!def) { this.finishUnitTurn(unit); return; }
+
+    // Heal self
+    const maxHp  = unit.heroData.baseStats.hp;
+    const healed = Math.min(maxHp - unit.heroData.stats.hp, def.might * 2 || 10);
+    unit.heroData.stats.hp = Math.min(maxHp, unit.heroData.stats.hp + healed);
+    this.showDamageNumber(unit, healed, false);
+
+    // Consume durability
+    const result = (slot.currentDurability - 1 > 0)
+      ? { ...slot, currentDurability: slot.currentDurability - 1 }
+      : (def.onBreak === 'DISABLED' ? { ...slot, currentDurability: 0 } : null);
+    if (result === null) {
+      unit.heroData.combatLoadout.splice(slotIdx, 1);
+    } else {
+      unit.heroData.combatLoadout[slotIdx] = result;
+    }
+
+    this.state = 'ANIMATING';
+    this.time.delayedCall(400, () => {
+      this.updateInfoPanel();
+      this.finishUnitTurn(unit);
+    });
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -471,15 +528,21 @@ export class BattleScene extends Phaser.Scene {
       }
     }
 
-    // After all strikes — check deaths, finish turn
+    // After all strikes — durability → XP → check deaths
     this.time.delayedCall(delay + 100, () => {
-      // Reduce durability
-      if (attacker.heroData.combatLoadout[0]) attacker.heroData.combatLoadout[0].currentDurability--;
-      if (defender.heroData.combatLoadout[0] && defW) defender.heroData.combatLoadout[0].currentDurability--;
+      const killedDefender = defender.heroData.stats.hp <= 0;
+      const defLevel = defender.heroData.level;
 
-      this.updateInfoPanel();
-      // checkDeaths handles finishUnitTurn internally after death animations
-      this.checkDeaths(attacker);
+      // Reduce durability (handles DISABLED stay / BREAKS remove)
+      applyPostCombatDurability(
+        0, attacker.heroData.combatLoadout, atkW,
+        defW ? 0 : null, defender.heroData.combatLoadout, defW,
+      );
+
+      // Grant XP to attacker (player units only), then proceed
+      this.grantXP(attacker, defLevel, killedDefender, () => {
+        this.checkDeaths(attacker);
+      });
     });
   }
 
@@ -612,9 +675,33 @@ export class BattleScene extends Phaser.Scene {
     }
 
     this.time.delayedCall(delay + 100, () => {
-      this.updateInfoPanel();
-      this.checkDeaths(); // no combatAttacker → enemy phase continues via runEnemyAI timer
+      applyPostCombatDurability(
+        0, attacker.heroData.combatLoadout, atkW,
+        defW ? 0 : null, defender.heroData.combatLoadout, defW,
+      );
+      // Defender (player) may gain XP for surviving a counter
+      const killedAttacker = attacker.heroData.stats.hp <= 0;
+      this.grantXP(defender, attacker.heroData.level, killedAttacker, () => {
+        this.checkDeaths(); // no combatAttacker → enemy phase continues via runEnemyAI timer
+      });
     });
+  }
+
+  /**
+   * Grant XP to a player unit after combat. Shows level-up popup if applicable.
+   * onDone fires when everything is settled (popup dismissed or no popup).
+   */
+  private grantXP(unit: Unit, defenderLevel: number, killedDefender: boolean, onDone: () => void) {
+    if (!this.playerUnits.includes(unit)) { onDone(); return; }
+    const xp = calcCombatXP(unit.heroData.level, defenderLevel, killedDefender);
+    const result = addExperience(unit.heroData, xp, this.rng);
+    this.updateInfoPanel();
+    if (result) {
+      const name = unit.heroData.nameRecord.changedName ?? unit.heroData.nameRecord.originalName;
+      this.levelUpDisplay.show(name, result, onDone);
+    } else {
+      onDone();
+    }
   }
 
   private endEnemyPhase() {
@@ -683,8 +770,10 @@ export class BattleScene extends Phaser.Scene {
       fontSize: '9px', color: '#444466', resolution: 2,
     });
 
-    this.actionMenu = new ActionMenu(this);
-    this.forecast   = new BattleForecast(this);
+    this.actionMenu     = new ActionMenu(this);
+    this.forecast       = new BattleForecast(this);
+    this.levelUpDisplay = new LevelUpDisplay(this);
+    this.inventoryPanel = new InventoryPanel(this);
   }
 
   private updateInfoPanel() {
