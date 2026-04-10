@@ -41,7 +41,7 @@ export function addExperience(
 ): LevelUpResult | null {
   if (hero.level >= MAX_LEVEL) return null; // level cap — no XP gain
 
-  hero.experience = Math.min(hero.experience + xp, XP_PER_LEVEL - 1 + xp);
+  hero.experience += xp;
 
   if (hero.experience < XP_PER_LEVEL) return null;
 

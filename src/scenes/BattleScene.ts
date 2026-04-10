@@ -447,11 +447,13 @@ export class BattleScene extends Phaser.Scene {
     const def  = WEAPONS_BY_ID[slot.defId];
     if (!def) { this.finishUnitTurn(unit); return; }
 
-    // Heal self
+    // Heal self — abort if already full HP (don't waste durability)
     const maxHp  = unit.heroData.baseStats.hp;
-    const healed = Math.min(maxHp - unit.heroData.stats.hp, def.might * 2 || 10);
-    unit.heroData.stats.hp = Math.min(maxHp, unit.heroData.stats.hp + healed);
-    this.showDamageNumber(unit, healed, false);
+    const missing = maxHp - unit.heroData.stats.hp;
+    if (missing <= 0) { this.finishUnitTurn(unit); return; }
+    const healed = Math.min(missing, def.might > 0 ? def.might * 2 : 10);
+    unit.heroData.stats.hp += healed;
+    this.showDamageNumber(unit, healed, false, true);
 
     // Consume durability
     const result = (slot.currentDurability - 1 > 0)
@@ -692,7 +694,8 @@ export class BattleScene extends Phaser.Scene {
    * onDone fires when everything is settled (popup dismissed or no popup).
    */
   private grantXP(unit: Unit, defenderLevel: number, killedDefender: boolean, onDone: () => void) {
-    if (!this.playerUnits.includes(unit)) { onDone(); return; }
+    // Only living player units gain XP
+    if (!this.playerUnits.includes(unit) || unit.heroData.stats.hp <= 0) { onDone(); return; }
     const xp = calcCombatXP(unit.heroData.level, defenderLevel, killedDefender);
     const result = addExperience(unit.heroData, xp, this.rng);
     this.updateInfoPanel();
@@ -729,12 +732,14 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  private showDamageNumber(unit: Unit, damage: number, crit: boolean) {
+  private showDamageNumber(unit: Unit, damage: number, crit: boolean, isHeal = false) {
     const x = unit.x;
     const y = unit.y - 20;
-    const txt = this.add.text(x, y, crit ? `★${damage}` : `${damage}`, {
+    const label = isHeal ? `+${damage}` : crit ? `★${damage}` : `${damage}`;
+    const color = isHeal ? '#40ff80' : crit ? '#ff4040' : '#ffffff';
+    const txt = this.add.text(x, y, label, {
       fontSize: crit ? '18px' : '14px',
-      color: crit ? '#ff4040' : '#ffffff',
+      color,
       stroke: '#000', strokeThickness: 3,
       resolution: 2,
     }).setOrigin(0.5).setDepth(200);
