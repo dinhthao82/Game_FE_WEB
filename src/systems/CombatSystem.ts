@@ -74,16 +74,16 @@ export function calcDamage(
   const tri = defWeapon ? getTriangle(weapon.type, defWeapon.type) : { atkBonus: 0, hitBonus: 0 };
 
   // Damage
-  const isPhys = !['FIRE','BLIZZARD','THUNDER','WIND','LIGHT','DARK'].includes(weapon.type);
+  const MAGIC_WEAPON_TYPES = ['FIRE','BLIZZARD','THUNDER','WIND','LIGHT','DARK','SUMMON'];
+  const isPhys = !MAGIC_WEAPON_TYPES.includes(weapon.type);
   const rawAtk   = (isPhys ? ats.str : ats.mag) + weapon.might + tri.atkBonus;
   const rawDef   = isPhys ? dfs.def + terrainDef : dfs.res;
   const atkDmg   = Math.max(0, rawAtk - rawDef);
-  const critDmg  = atkDmg * 3;
 
   // Defender counter (if defWeapon exists)
   let defDmg = 0;
   if (defWeapon) {
-    const defIsPhys = !['FIRE','BLIZZARD','THUNDER','WIND','LIGHT','DARK'].includes(defWeapon.type);
+    const defIsPhys = !MAGIC_WEAPON_TYPES.includes(defWeapon.type);
     const defRawAtk = (defIsPhys ? dfs.str : dfs.mag) + defWeapon.might - tri.atkBonus;
     const defRawDef = defIsPhys ? ats.def : ats.res;
     defDmg = Math.max(0, defRawAtk - defRawDef);
@@ -105,10 +105,11 @@ export function calcDamage(
   const defCrit = defWeapon ? Math.max(0, Math.floor(dfs.skl / 2) + defWeapon.critBonus - ats.lck) : 0;
 
   // Double attack
+  // Brave = 2 extra strikes (4 total per round if not doubled, as per plan)
   const atkDoubles = ats.spd - dfs.spd >= 4;
   const defDoubles = defWeapon && dfs.spd - ats.spd >= 4;
-  const atkBrave   = weapon.brave   ? 2 : 0;
-  const defBrave   = defWeapon?.brave ? 2 : 0;
+  const atkBrave   = weapon.brave    ? 3 : 0;   // +3 → total 4 hits
+  const defBrave   = defWeapon?.brave ? 3 : 0;
 
   return {
     attackerStrikes: 1 + atkBrave + (atkDoubles ? 1 : 0),

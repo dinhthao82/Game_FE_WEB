@@ -1,6 +1,7 @@
 import type { Unit } from '@/entities/Unit';
 import type { GridSystem, GridPos } from '@/systems/GridSystem';
 import { WEAPONS_BY_ID } from '@/data/weapons';
+import { CLASS_BY_ID } from '@/data/classes';
 
 function manhattan(a: GridPos, b: GridPos): number {
   return Math.abs(a.col - b.col) + Math.abs(a.row - b.row);
@@ -21,6 +22,8 @@ export function planEnemyTurn(
   tileH:    number,
 ): AIAction[] {
   const actions: AIAction[] = [];
+  if (players.length === 0) return actions;
+
   // Track positions as enemies move so they don't stack
   const occupied = new Set<string>([
     ...players.map(u => `${u.gridPos.col},${u.gridPos.row}`),
@@ -30,7 +33,7 @@ export function planEnemyTurn(
     const weaponId = enemy.heroData.combatLoadout[0]?.defId;
     const weapon   = weaponId ? WEAPONS_BY_ID[weaponId] : null;
     const [minR, maxR] = weapon ? weapon.range : [1, 1];
-    const moveRange    = enemy.heroData.currentClass === 'KNIGHT' ? 3 : 4;
+    const moveRange    = CLASS_BY_ID[enemy.heroData.currentClass]?.movementRange ?? 4;
 
     // Remove own pos from occupied before planning
     occupied.delete(`${enemy.gridPos.col},${enemy.gridPos.row}`);

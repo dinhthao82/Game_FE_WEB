@@ -45,8 +45,8 @@ export class Unit extends Phaser.GameObjects.Container {
     const bodyC  = this.CLASS_COLORS[cls] ?? 0x444444;
     const hairC  = this.HAIR_COLORS[ap.hairColor] ?? 0xffffff;
     const eyeC   = this.EYE_COLORS[ap.eyeColor] ?? 0x444444;
-    const capeC  = cls.includes('KNIGHT') || cls === 'BARD' || cls === 'TROUBADOUR'
-                   ? 0x5b21b6 : 0x00000000;
+    const CAPE_CLASSES = new Set(['DARK_KNIGHT','PALADIN','GRAND_KNIGHT','BARD','TROUBADOUR','ARCHMAGE','EIDOLON_MASTER']);
+    const capeC  = CAPE_CLASSES.has(cls) ? 0x5b21b6 : 0x00000000;
 
     const u = tileW;  // 32 = 1 tile unit
 

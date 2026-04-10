@@ -10,6 +10,7 @@ import type { ActionChoice } from '@/ui/ActionMenu';
 import { BattleForecast } from '@/ui/BattleForecast';
 import { TERRAIN } from '@/data/terrain';
 import { WEAPONS_BY_ID } from '@/data/weapons';
+import { CLASS_BY_ID } from '@/data/classes';
 import type { TerrainType } from '@/types';
 import type { HeroData } from '@/types/HeroData';
 import { HairStyle, HairColor, SkinTone, EyeColor, HolyBlood, BloodRank } from '@/types';
@@ -442,37 +443,31 @@ export class BattleScene extends Phaser.Scene {
       this.grid.getTerrain(defender.gridPos.col, defender.gridPos.row),
     );
 
-    // Apply hits sequentially with short delays
+    // Schedule one delayed strike at 'delay' ms, then advance delay by 220ms.
     let delay = 0;
-    const applyStrike = (src: Unit, tgt: Unit, dmg: number, hit: number, crit: number, isBrave: boolean) => {
-      const strikes = isBrave ? 2 : 1;
-      for (let i = 0; i < strikes; i++) {
-        this.time.delayedCall(delay, () => {
-          const result = resolveStrike(hit, dmg, crit, this.rng);
-          if (result.hit) {
-            tgt.heroData.stats.hp = Math.max(0, tgt.heroData.stats.hp - result.damage);
-            this.flashUnit(tgt, result.crit ? 0xff4444 : 0xffffff);
-            this.showDamageNumber(tgt, result.damage, result.crit);
-          }
-        });
-        delay += 250;
-      }
+    const scheduleStrike = (tgt: Unit, dmg: number, hit: number, crit: number) => {
+      this.time.delayedCall(delay, () => {
+        if (tgt.heroData.stats.hp <= 0) return; // already dead
+        const result = resolveStrike(hit, dmg, crit, this.rng);
+        if (result.hit) {
+          tgt.heroData.stats.hp = Math.max(0, tgt.heroData.stats.hp - result.damage);
+          this.flashUnit(tgt, result.crit ? 0xff4444 : 0xffffff);
+          this.showDamageNumber(tgt, result.damage, result.crit);
+        }
+      });
+      delay += 220;
     };
 
-    // Attacker strikes
+    // Attacker strikes (fc.attackerStrikes already accounts for brave + double)
     for (let i = 0; i < fc.attackerStrikes; i++) {
-      const isBrave = atkW.brave && i === 0;
-      applyStrike(attacker, defender, fc.attackerDamage, fc.attackerHit, fc.attackerCrit, isBrave);
-      if (!isBrave) delay += 250;
+      scheduleStrike(defender, fc.attackerDamage, fc.attackerHit, fc.attackerCrit);
     }
 
     // Defender counter
     if (defW && fc.defenderStrikes > 0) {
-      delay += 100;
+      delay += 80; // brief pause before counter
       for (let i = 0; i < fc.defenderStrikes; i++) {
-        const isBrave = defW.brave && i === 0;
-        applyStrike(defender, attacker, fc.defenderDamage, fc.defenderHit, fc.defenderCrit, isBrave);
-        if (!isBrave) delay += 250;
+        scheduleStrike(attacker, fc.defenderDamage, fc.defenderHit, fc.defenderCrit);
       }
     }
 
@@ -482,32 +477,36 @@ export class BattleScene extends Phaser.Scene {
       if (attacker.heroData.combatLoadout[0]) attacker.heroData.combatLoadout[0].currentDurability--;
       if (defender.heroData.combatLoadout[0] && defW) defender.heroData.combatLoadout[0].currentDurability--;
 
-      this.checkDeaths();
       this.updateInfoPanel();
-
-      if (this.state !== 'GAME_OVER' && this.state !== 'VICTORY') {
-        this.finishUnitTurn(attacker);
-      }
+      // checkDeaths handles finishUnitTurn internally after death animations
+      this.checkDeaths(attacker);
     });
   }
 
-  private checkDeaths() {
-    [...this.playerUnits, ...this.enemyUnits].forEach(u => {
-      if (u.heroData.stats.hp <= 0) {
-        this.flashUnit(u, 0x444444);
-        this.time.delayedCall(300, () => this.removeUnit(u));
-      }
+  private checkDeaths(combatAttacker?: Unit) {
+    const dying = [...this.playerUnits, ...this.enemyUnits]
+      .filter(u => u.heroData.stats.hp <= 0);
+
+    dying.forEach(u => {
+      this.flashUnit(u, 0x444444);
+      this.time.delayedCall(300, () => this.removeUnit(u));
     });
 
-    // Check win/lose after removing
-    this.time.delayedCall(350, () => {
+    // After deaths removed, check win/lose THEN finish attacker turn
+    const afterDelay = dying.length > 0 ? 400 : 0;
+    this.time.delayedCall(afterDelay, () => {
       if (this.playerUnits.filter(u => u.heroData.stats.hp > 0).length === 0) {
         this.state = 'GAME_OVER';
         this.showEndScreen('DEFEAT', 0x880000);
-      } else if (this.enemyUnits.filter(u => u.heroData.stats.hp > 0).length === 0) {
+        return;
+      }
+      if (this.enemyUnits.filter(u => u.heroData.stats.hp > 0).length === 0) {
         this.state = 'VICTORY';
         this.showEndScreen('VICTORY', 0x224400);
+        return;
       }
+      // No game-ending condition — proceed with turn
+      if (combatAttacker) this.finishUnitTurn(combatAttacker);
     });
   }
 
@@ -585,6 +584,7 @@ export class BattleScene extends Phaser.Scene {
     let delay = 0;
     for (let i = 0; i < fc.attackerStrikes; i++) {
       this.time.delayedCall(delay, () => {
+        if (defender.heroData.stats.hp <= 0) return;
         const r = resolveStrike(fc.attackerHit, fc.attackerDamage, fc.attackerCrit, this.rng);
         if (r.hit) {
           defender.heroData.stats.hp = Math.max(0, defender.heroData.stats.hp - r.damage);
@@ -592,13 +592,14 @@ export class BattleScene extends Phaser.Scene {
           this.showDamageNumber(defender, r.damage, r.crit);
         }
       });
-      delay += 250;
+      delay += 220;
     }
 
     if (defW && fc.defenderStrikes > 0) {
-      delay += 100;
+      delay += 80;
       for (let i = 0; i < fc.defenderStrikes; i++) {
         this.time.delayedCall(delay, () => {
+          if (attacker.heroData.stats.hp <= 0) return;
           const r = resolveStrike(fc.defenderHit, fc.defenderDamage, fc.defenderCrit, this.rng);
           if (r.hit) {
             attacker.heroData.stats.hp = Math.max(0, attacker.heroData.stats.hp - r.damage);
@@ -606,13 +607,13 @@ export class BattleScene extends Phaser.Scene {
             this.showDamageNumber(attacker, r.damage, r.crit);
           }
         });
-        delay += 250;
+        delay += 220;
       }
     }
 
     this.time.delayedCall(delay + 100, () => {
-      this.checkDeaths();
       this.updateInfoPanel();
+      this.checkDeaths(); // no combatAttacker → enemy phase continues via runEnemyAI timer
     });
   }
 
@@ -731,10 +732,7 @@ export class BattleScene extends Phaser.Scene {
   // HELPERS
   // ══════════════════════════════════════════════════════════════
   private getMoveRange(unit: Unit): number {
-    const c = unit.heroData.currentClass;
-    if (c === 'KNIGHT' || c === 'MACHINIST') return 3;
-    if (c === 'NINJA') return 5;
-    return 4;
+    return CLASS_BY_ID[unit.heroData.currentClass]?.movementRange ?? 4;
   }
 
   private getEquippedWeapon(unit: Unit) {
